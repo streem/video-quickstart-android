@@ -28,13 +28,16 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.gson.JsonObject;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 import com.twilio.video.AudioCodec;
-import com.twilio.video.EncodingParameters;
 import com.twilio.video.CameraCapturer;
+import com.twilio.video.CameraCapturer.CameraSource;
+import com.twilio.video.ConnectOptions;
+import com.twilio.video.EncodingParameters;
+import com.twilio.video.LocalAudioTrack;
 import com.twilio.video.LocalParticipant;
+import com.twilio.video.LocalVideoTrack;
 import com.twilio.video.RemoteAudioTrack;
 import com.twilio.video.RemoteAudioTrackPublication;
 import com.twilio.video.RemoteDataTrack;
@@ -42,28 +45,25 @@ import com.twilio.video.RemoteDataTrackPublication;
 import com.twilio.video.RemoteParticipant;
 import com.twilio.video.RemoteVideoTrack;
 import com.twilio.video.RemoteVideoTrackPublication;
+import com.twilio.video.Room;
 import com.twilio.video.RoomState;
+import com.twilio.video.TwilioException;
 import com.twilio.video.Video;
 import com.twilio.video.VideoCodec;
+import com.twilio.video.VideoConstraints;
+import com.twilio.video.VideoDimensions;
 import com.twilio.video.VideoRenderer;
-import com.twilio.video.TwilioException;
+import com.twilio.video.VideoTrack;
+import com.twilio.video.VideoView;
 import com.twilio.video.quickstart.BuildConfig;
 import com.twilio.video.quickstart.R;
 import com.twilio.video.quickstart.dialog.Dialog;
-import com.twilio.video.CameraCapturer.CameraSource;
-import com.twilio.video.ConnectOptions;
-import com.twilio.video.LocalAudioTrack;
-import com.twilio.video.LocalVideoTrack;
-import com.twilio.video.Room;
-import com.twilio.video.VideoTrack;
-import com.twilio.video.VideoView;
 import com.twilio.video.quickstart.util.CameraCapturerCompat;
+
+import org.webrtc.voiceengine.WebRtcAudioManager;
 
 import java.util.Collections;
 import java.util.UUID;
-
-import static com.twilio.video.quickstart.R.drawable.ic_phonelink_ring_white_24dp;
-import static com.twilio.video.quickstart.R.drawable.ic_volume_up_white_24dp;
 
 import static com.twilio.video.quickstart.R.drawable.ic_phonelink_ring_white_24dp;
 import static com.twilio.video.quickstart.R.drawable.ic_volume_up_white_24dp;
@@ -118,6 +118,7 @@ public class VideoActivity extends AppCompatActivity {
      */
     private VideoView primaryVideoView;
     private VideoView thumbnailVideoView;
+    private VideoRenderer testRenderer;
 
     /*
      * Android shared preferences used for settings
@@ -361,14 +362,30 @@ public class VideoActivity extends AppCompatActivity {
     }
 
     private void createAudioAndVideoTracks() {
+        String deviceName = android.os.Build.MODEL;
+
+        // Pixel 2 needs to disable OpenSL ES to avoid interference with echo cancellation
+        if (deviceName != null && deviceName.contains("Pixel")) {
+            WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
+        }
+
         // Share your microphone
         localAudioTrack = LocalAudioTrack.create(this, true, LOCAL_AUDIO_TRACK_NAME);
+
+
+        VideoConstraints constraints = new VideoConstraints.Builder()
+                .minVideoDimensions(VideoDimensions.HD_720P_VIDEO_DIMENSIONS)
+                .maxVideoDimensions(VideoDimensions.HD_720P_VIDEO_DIMENSIONS)
+                .minFps(10)
+                .maxFps(30)
+                .build();
 
         // Share your camera
         cameraCapturerCompat = new CameraCapturerCompat(this, getAvailableCameraSource());
         localVideoTrack = LocalVideoTrack.create(this,
                 true,
                 cameraCapturerCompat.getVideoCapturer(),
+                constraints,
                 LOCAL_VIDEO_TRACK_NAME);
         primaryVideoView.setMirror(true);
         localVideoTrack.addRenderer(primaryVideoView);
